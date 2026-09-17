@@ -1,89 +1,88 @@
-import Link from "next/link";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient } from "@/lib/supabase/server";
 import { approveParticipant } from "@/services/participant-service";
+import { RoleShell } from "@/components/layout/role-shell";
 import { demoStore } from "@/services/demo-store";
 
 export default async function VerificationPage() {
-  const adminDb = createAdminClient();
   let pendingList: any[] = [];
 
   try {
-    const { data } = await adminDb
+    const supabase = await createClient();
+    const { data } = await supabase
       .from("participants")
       .select("id, illenium_id, college_roll_number, verification_status, registration_status, profiles(full_name, email), colleges(name)")
       .eq("verification_status", "pending")
       .order("created_at");
-    if (data && data.length > 0) pendingList = data;
-  } catch {
-    // Fallback if DB query fails
-  }
 
-  // Merge demoStore pending items
-  const demoPending = demoStore.getAll().filter((p) => p.verificationStatus === "pending");
-  for (const d of demoPending) {
-    if (!pendingList.some((p) => p.id === d.id)) {
-      pendingList.push({
-        id: d.id,
-        illenium_id: d.illeniumId,
-        college_roll_number: d.collegeRollNumber,
-        verification_status: d.verificationStatus,
-        registration_status: d.registrationStatus,
-        profiles: { full_name: d.fullName, email: d.email },
-        colleges: { name: d.college }
+    if (data && data.length > 0) {
+      pendingList = data.map((row) => {
+        const profile = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles;
+        const college = Array.isArray(row.colleges) ? row.colleges[0] : row.colleges;
+        return {
+          id: row.id,
+          full_name: profile?.full_name ?? "Participant",
+          email: profile?.email ?? "—",
+          college: college?.name ?? "Atlas SkillTech University",
+          roll_number: row.college_roll_number ?? "—"
+        };
       });
     }
+  } catch {
+    /* fallback to demoStore */
+  }
+
+  if (pendingList.length === 0) {
+    const demos = demoStore.getAll().filter((d) => d.verificationStatus === "pending");
+    pendingList = demos.map((d) => ({
+      id: d.id,
+      full_name: d.fullName,
+      email: d.email,
+      college: d.college,
+      roll_number: d.collegeRollNumber
+    }));
   }
 
   return (
-    <div className="app-shell">
-      <header className="app-nav">
-        <Link href="/admin/dashboard" className="brand">
-          <span className="brand-mark">
-            <span>✦</span>
-          </span>{" "}
-          ILLENIUM 2026
-        </Link>
-        <span>VERIFICATION QUEUE</span>
-      </header>
-      <main className="app-main">
-        <h1 style={{ fontSize: "2.5rem" }}>Pending Verification ({pendingList.length})</h1>
-        <div className="panel table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Email</th>
-                <th>College</th>
-                <th>Roll number</th>
-                <th>Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {pendingList.map((row) => {
-                const profile = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles;
-                const college = Array.isArray(row.colleges) ? row.colleges[0] : row.colleges;
-                return (
-                  <tr key={row.id}>
-                    <td>{profile?.full_name || "Participant"}</td>
-                    <td>{profile?.email || "—"}</td>
-                    <td>{college?.name || "Atlas SkillTech University"}</td>
-                    <td>{row.college_roll_number}</td>
-                    <td>
-                      <form action={approveParticipant}>
-                        <input type="hidden" name="participantId" value={row.id} />
-                        <button className="btn btn-primary" style={{ padding: ".4rem .8rem", fontSize: ".8rem" }}>
-                          Approve & generate ID
-                        </button>
-                      </form>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-          {!pendingList.length && <p className="muted" style={{ padding: "1rem" }}>No pending participants awaiting approval.</p>}
+    <RoleShell role="admin">
+      <div className="workspace-page-head">
+        <div>
+          <div className="workspace-kicker">Review queue</div>
+          <h1>Identity verification</h1>
+          <p className="workspace-subtitle">Review submitted documents before an ILLENIUM ID and secure QR are issued.</p>
         </div>
-      </main>
-    </div>
+        <span className="status-pill status-warning">{pendingList.length} awaiting review</span>
+      </div>
+      <div className="workspace-panel table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>College</th>
+              <th>Roll number</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {pendingList.map((row) => (
+              <tr key={row.id}>
+                <td>
+                  <strong>{row.full_name}</strong>
+                  <small>{row.email}</small>
+                </td>
+                <td>{row.college}</td>
+                <td>{row.roll_number}</td>
+                <td>
+                  <form action={approveParticipant}>
+                    <input type="hidden" name="participantId" value={row.id} />
+                    <button className="button button-primary">Approve & issue ID</button>
+                  </form>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {!pendingList.length && <p className="workspace-subtitle">The queue is clear.</p>}
+      </div>
+    </RoleShell>
   );
 }
