@@ -16,7 +16,8 @@ The app requires a Supabase project for authenticated registration, storage, ver
 
 - `/` public festival home
 - `/events` live event discovery
-- `/register` authenticated multi-step participant registration
+- `/register` multi-step participant registration (submit after logging in)
+- `/auth/login` Supabase Email/Password login
 - `/participant/dashboard` participant status and events
 - `/participant/id` server-rendered digital ID with QR
 - `/oc/dashboard` OC operations home
@@ -27,3 +28,5 @@ The app requires a Supabase project for authenticated registration, storage, ver
 ## Security notes
 
 QRs contain only an opaque token URL. Verification and check-in run on the server. The service-role key is never imported into client components. Duplicate check-ins are prevented by partial unique indexes and a transaction-safe Postgres function.
+
+For a complete handoff, start with [SETUP.md](SETUP.md) and [docs/HANDOFF.md](docs/HANDOFF.md). Do not use production participant data until the Supabase smoke-test checklist passes.
