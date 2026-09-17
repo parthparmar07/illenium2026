@@ -11,11 +11,29 @@ export type DemoParticipant = {
   createdAt: string;
 };
 
+export type DemoCheckIn = {
+  id: string;
+  participantId: string;
+  fullName: string;
+  illeniumId: string;
+  checkInType: "campus_entry" | "event_entry";
+  eventName?: string;
+  venue?: string;
+  scannedAt: string;
+  attendanceStatus: string;
+};
+
 // Global in-memory store for fallback demo mode
-const globalStore = globalThis as unknown as { __ILLENIUM_STORE__?: DemoParticipant[] };
+const globalStore = globalThis as unknown as {
+  __ILLENIUM_STORE__?: DemoParticipant[];
+  __ILLENIUM_CHECKINS__?: DemoCheckIn[];
+};
 
 if (!globalStore.__ILLENIUM_STORE__) {
   globalStore.__ILLENIUM_STORE__ = [];
+}
+if (!globalStore.__ILLENIUM_CHECKINS__) {
+  globalStore.__ILLENIUM_CHECKINS__ = [];
 }
 
 export const demoStore = {
@@ -40,5 +58,25 @@ export const demoStore = {
       return p;
     }
     return null;
+  },
+
+  getCheckIns: () => globalStore.__ILLENIUM_CHECKINS__ || [],
+  addCheckIn: (checkIn: DemoCheckIn): { ok: boolean; message: string } => {
+    if (!globalStore.__ILLENIUM_CHECKINS__) globalStore.__ILLENIUM_CHECKINS__ = [];
+    
+    // Check for duplicate check-in
+    const exists = globalStore.__ILLENIUM_CHECKINS__.some(
+      (c) =>
+        c.participantId === checkIn.participantId &&
+        c.checkInType === checkIn.checkInType &&
+        (c.eventName === checkIn.eventName || (!c.eventName && !checkIn.eventName))
+    );
+
+    if (exists) {
+      return { ok: false, message: "Already checked in." };
+    }
+
+    globalStore.__ILLENIUM_CHECKINS__.unshift(checkIn);
+    return { ok: true, message: "Check-in recorded successfully." };
   }
 };
